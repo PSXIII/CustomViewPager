@@ -1,64 +1,119 @@
 package com.example.chococardsek.customviewpager;
 
 import android.content.Context;
-import android.os.Handler;
 import android.support.v4.view.ViewPager;
+import android.util.AttributeSet;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
-@SuppressWarnings("WeakerAccess")
-public class CustomViewPager implements ViewPager.OnPageChangeListener {
+import com.example.chococardsek.customviewpager.databinding.CustomViewpagerBinding;
 
-    private Context mContext;
-    private ViewPager mViewPager;
-    private Handler mHandler;
-    private LinearLayout mViewIndicator;
+import java.util.concurrent.TimeUnit;
+
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
+
+public class CustomViewPager extends FrameLayout {
+
     private ImageView[] imageList;
-    private int mCurrentPosition;
+    private int mCurrentPosition = 0;
     private int mScrollState;
     private int mContentSize;
+    private Disposable subscription;
+    private CustomViewpagerBinding mBinding;
+    private CustomViewPagerAdapter mAdapter;
 
-    public CustomViewPager(Context mContext, ViewPager mViewPager, Handler mHandler, int mContentSize, LinearLayout mViewIndicator) {
-        this.mContext = mContext;
-        this.mViewPager = mViewPager;
-        this.mHandler = mHandler;
-        this.mContentSize = mContentSize;
-        this.mViewIndicator = mViewIndicator;
+    public CustomViewPager(Context context) {
+        super(context);
+        initInflate();
+        initInstance();
     }
 
-    public void setUIPagerIndicator() {
+    public CustomViewPager(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        initInflate();
+        initInstance();
+    }
+
+    private void initInflate() {
+        LayoutInflater inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        mBinding = CustomViewpagerBinding.inflate(inflater, this, true);
+    }
+
+    private void initInstance() {
+        mBinding.viewPager.performClick();
+    }
+
+    public void setResourceSize(int resourceSize) {
+        mContentSize = resourceSize;
+    }
+
+    private void setUIPagerIndicator() {
         if (mContentSize > 1) {
-            mViewIndicator.setVisibility(View.VISIBLE);
-            imageList = new ImageView[mContentSize];
+            mBinding.pagerIndicator.setVisibility(VISIBLE);
             for (int i = 0; i < mContentSize; i++) {
-                imageList[i] = new ImageView(mContext);
-                imageList[i].setImageDrawable(mContext.getResources().getDrawable(R.drawable.shape_dot));
+                imageList[i] = new ImageView(getContext());
+                imageList[i].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot));
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
                 params.setMargins(16, 0, 16, 0);
-                mViewIndicator.addView(imageList[i], params);
+                mBinding.pagerIndicator.addView(imageList[i], params);
             }
-            imageList[0].setImageDrawable(mContext.getResources().getDrawable(R.drawable.shape_dot_selected));
+            imageList[0].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot_selected));
         } else {
-            mViewIndicator.setVisibility(View.GONE);
+            mBinding.pagerIndicator.setVisibility(View.GONE);
         }
     }
 
-    @Override
-    public void onPageSelected(int position) {
-        for (int i = 0; i < mContentSize; i++)
-            imageList[i].setImageDrawable(mContext.getResources().getDrawable(R.drawable.shape_dot));
-        imageList[position].setImageDrawable(mContext.getResources().getDrawable(R.drawable.shape_dot_selected));
-        mCurrentPosition = position;
-    }
+    public void setAdapter(CustomViewPagerAdapter adapter) {
+        mAdapter = adapter;
+        mContentSize = adapter.getCount();
+        mBinding.viewPager.setAdapter(adapter);
+        imageList = new ImageView[mContentSize];
+        setUIPagerIndicator();
+        mBinding.viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageScrolled(int i, float v, int i1) {
 
-    @Override
-    public void onPageScrollStateChanged(int state) {
-        handleScrollState(state);
-        mScrollState = state;
+            }
+
+            @Override
+            public void onPageSelected(int position) {
+                mCurrentPosition = position;
+                for (int i = 0; i < mContentSize; i++)
+                    imageList[i].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot));
+                imageList[position].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot_selected));
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) {
+                handleScrollState(state);
+                mScrollState = state;
+            }
+        });
+
+        mBinding.viewPager.setOnTouchListener(new OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_MOVE:
+                        stopSlide();
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        runSlide();
+                        break;
+                }
+                return false;
+            }
+        });
     }
 
     private void handleScrollState(int state) {
@@ -76,25 +131,35 @@ public class CustomViewPager implements ViewPager.OnPageChangeListener {
     private void handleSetNextItem() {
         final int lastPosition = mContentSize - 1;
         if (mCurrentPosition == 0)
-            mViewPager.setCurrentItem(lastPosition, false);
+            mBinding.viewPager.setCurrentItem(lastPosition, false);
         else if (mCurrentPosition == lastPosition)
-            mViewPager.setCurrentItem(0, false);
+            mBinding.viewPager.setCurrentItem(0, false);
     }
 
-    public Runnable viewPagerLooper = new Runnable() {
-        @Override
-        public void run() {
-            if (mCurrentPosition == mContentSize) mCurrentPosition = 0;
-            mViewPager.setCurrentItem(mCurrentPosition++, true);
-            mHandler.postDelayed(viewPagerLooper, 3000); // 5 seconds
-        }
-    };
+    public void runSlide() {
+        if (subscription == null || subscription.isDisposed())
+            subscription = Observable.interval(0, 5000, TimeUnit.MILLISECONDS)
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(new Consumer<Long>() {
+                        @Override
+                        public void accept(Long aLong) throws Exception {
+                            if (mCurrentPosition == mContentSize) {
+                                mCurrentPosition = 0;
+                                mBinding.viewPager.setCurrentItem(mCurrentPosition++, false);
+                            } else {
+                                mBinding.viewPager.setCurrentItem(mCurrentPosition++, true);
+                            }
+                        }
+                    });
+    }
 
-    public void stopViewPagerLooper() {
-        mHandler.removeCallbacks(viewPagerLooper);
+    public void stopSlide() {
+        if (subscription != null)
+            subscription.dispose();
     }
 
     @Override
-    public void onPageScrolled(int position, float v, int i1) {
+    public boolean performClick() {
+        return true;
     }
 }
