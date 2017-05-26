@@ -14,4 +14,12 @@ public class RecyclerViewHolder extends RecyclerView.ViewHolder {
         super(itemView);
         mBinding = DataBindingUtil.bind(itemView);
     }
+
+    public void setItemText(String text) {
+        mBinding.tvItem.setText(text);
+    }
+
+    public void setRecyclerItemOnClickListener(View.OnClickListener listener) {
+        mBinding.tvItem.setOnClickListener(listener);
+    }
 }

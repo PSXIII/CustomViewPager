@@ -9,11 +9,6 @@
         android:orientation="vertical"
         tools:context=".MainActivity">
 
-        <com.example.chococardsek.customviewpager.CustomViewPager
-            android:id="@+id/custom_slide"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"/>
-
         <android.support.v7.widget.RecyclerView
             android:id="@+id/recyclerView"
             android:layout_width="match_parent"
