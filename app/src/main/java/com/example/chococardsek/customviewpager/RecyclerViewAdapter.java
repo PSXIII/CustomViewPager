@@ -10,18 +10,18 @@ import java.util.ArrayList;
 
 public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-    private Context mContext;
+    private Context context;
     private ArrayList<String> mResources;
 
     private SlideClickListener slideClickListener;
     private ItemClickListener itemClickListener;
 
-    public RecyclerViewAdapter(Context mContext,
+    public RecyclerViewAdapter(Context context,
                                ArrayList<String> mViewPagerResources,
                                SlideClickListener slideClickListener,
                                ItemClickListener itemClickListener) {
         this.mResources = mViewPagerResources;
-        this.mContext = mContext;
+        this.context = context;
         this.slideClickListener = slideClickListener;
         this.itemClickListener = itemClickListener;
     }

@@ -8,13 +8,15 @@ import com.example.chococardsek.customviewpager.databinding.ItemCustomViewpagerB
 
 import java.util.ArrayList;
 
+import static android.databinding.DataBindingUtil.*;
+
 public class CustomViewPagerHolder extends RecyclerView.ViewHolder {
 
     private ItemCustomViewpagerBinding mBinding;
 
     public CustomViewPagerHolder(View itemView) {
         super(itemView);
-        mBinding = DataBindingUtil.bind(itemView);
+        mBinding = bind(itemView);
     }
 
     public void binding(ArrayList<String> mResources) {

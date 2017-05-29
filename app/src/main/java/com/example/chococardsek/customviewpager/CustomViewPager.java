@@ -1,10 +1,13 @@
 package com.example.chococardsek.customviewpager;
 
+import android.annotation.TargetApi;
 import android.content.Context;
-import android.databinding.DataBindingUtil;
+import android.os.Build;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.view.PagerAdapter;
-import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -13,9 +16,10 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
-import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.chococardsek.customviewpager.databinding.CustomViewpagerBinding;
 import com.example.chococardsek.customviewpager.databinding.ItemPagerBinding;
+import com.jakewharton.rxbinding2.support.v4.view.RxViewPager;
 
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
@@ -25,12 +29,11 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 
+import static android.databinding.DataBindingUtil.bind;
+
 public class CustomViewPager extends FrameLayout {
 
-    private ImageView[] imageList;
     private int mCurrentPosition = 0;
-    private int mScrollState;
-    private int mContentSize = 0;
     private Disposable subscription;
     private CustomViewpagerBinding mBinding;
     private CustomViewPagerAdapter mAdapter;
@@ -49,6 +52,20 @@ public class CustomViewPager extends FrameLayout {
         initInstance();
     }
 
+    public CustomViewPager(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        initInflate();
+        initInstance();
+    }
+
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    public CustomViewPager(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        super(context, attrs, defStyleAttr, defStyleRes);
+        initInflate();
+        initInstance();
+    }
+
+
     private void initInflate() {
         LayoutInflater inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         mBinding = CustomViewpagerBinding.inflate(inflater, this, true);
@@ -57,113 +74,92 @@ public class CustomViewPager extends FrameLayout {
     private void initInstance() {
         delay = 0;
         mBinding.viewPager.performClick();
-        mAdapter = new CustomViewPagerAdapter(getContext());
+        mAdapter = new CustomViewPagerAdapter();
         mBinding.viewPager.setAdapter(mAdapter);
-        mContentSize = mAdapter.getCount();
-        imageList = new ImageView[mContentSize];
         setUIPagerIndicator();
+    }
+
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (delay == 0)
+            return super.dispatchTouchEvent(ev);
+
+        switch (ev.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_MOVE:
+                stopSlide();
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                runSlide(delay);
+                break;
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     public void setupCustomViewPager(ArrayList<String> resources) {
         mAdapter.setResources(resources);
-        mContentSize = mAdapter.getCount();
-        imageList = new ImageView[mContentSize];
         setUIPagerIndicator();
 
-        mBinding.viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-            @Override
-            public void onPageScrolled(int i, float v, int i1) {
+        RxViewPager.pageSelections(mBinding.viewPager)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Consumer<Integer>() {
+                    @Override
+                    public void accept(Integer integer) throws Exception {
+                        mCurrentPosition = integer;
+                        //loop set active indicator
+                        for (int index = 0; index < mBinding.pagerIndicator.getChildCount(); index++) {
+                            ImageView view = (ImageView) mBinding.pagerIndicator.getChildAt(index);
+                            view.setImageResource(index == integer ? R.drawable.shape_dot_selected : R.drawable.shape_dot);
+                        }
+                    }
+                });
 
-            }
-
-            @Override
-            public void onPageSelected(int position) {
-                mCurrentPosition = position;
-                for (int i = 0; i < mContentSize; i++)
-                    imageList[i].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot));
-                imageList[position].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot_selected));
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-                handleScrollState(state);
-                mScrollState = state;
-            }
-        });
-
-        mBinding.viewPager.setOnTouchListener(new OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                if (delay == 0)
-                    return false;
-
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_MOVE:
-                        stopSlide();
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        runSlide(5000);
-                        break;
-                }
-                return false;
-            }
-        });
     }
 
     private void setUIPagerIndicator() {
-        mBinding.pagerIndicator.removeAllViews();
-        if (mContentSize > 1) {
+        mBinding.pagerIndicator.removeAllViews();//remove all indicator
+        //check size of content
+        int count = mAdapter.getCount();
+        if (count > 1) {
             mBinding.pagerIndicator.setVisibility(VISIBLE);
-            for (int i = 0; i < mContentSize; i++) {
-                imageList[i] = new ImageView(getContext());
-                imageList[i].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot));
+
+            //for loop create indicator
+            for (int i = 0; i < count; i++) {
+                ImageView imageView = new ImageView(getContext());
+                imageView.setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot));
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
                 params.setMargins(16, 0, 16, 0);
-                mBinding.pagerIndicator.addView(imageList[i], params);
+                mBinding.pagerIndicator.addView(imageView, params);
             }
-            imageList[0].setImageDrawable(getContext().getResources().getDrawable(R.drawable.shape_dot_selected));
+            //set active indicator in position 0
+            ImageView _1stImage = (ImageView) mBinding.pagerIndicator.getChildAt(0);
+            _1stImage.setImageResource(R.drawable.shape_dot_selected);
         } else {
+//            hide indicator layout
             mBinding.pagerIndicator.setVisibility(View.GONE);
         }
     }
 
-    private void handleScrollState(int state) {
-        if (state == ViewPager.SCROLL_STATE_IDLE) setNextItemIfNeeded();
-    }
-
-    private void setNextItemIfNeeded() {
-        if (!isScrollStateSettling()) handleSetNextItem();
-    }
-
-    private boolean isScrollStateSettling() {
-        return mScrollState == ViewPager.SCROLL_STATE_SETTLING;
-    }
-
-    private void handleSetNextItem() {
-        final int lastPosition = mContentSize - 1;
-        if (mCurrentPosition == 0)
-            mBinding.viewPager.setCurrentItem(lastPosition, false);
-        else if (mCurrentPosition == lastPosition)
-            mBinding.viewPager.setCurrentItem(0, false);
-    }
 
     public void runSlide(int delay) {
         stopSlide();
         this.delay = delay;
 
         if (subscription == null || subscription.isDisposed())
-            subscription = Observable.interval(0, delay, TimeUnit.MILLISECONDS)
+            subscription = Observable.interval(delay, TimeUnit.MILLISECONDS)
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(new Consumer<Long>() {
                         @Override
                         public void accept(Long aLong) throws Exception {
-//                            Log.d("time",aLong+"");
-                            if (mCurrentPosition == mContentSize) {
+                            int count = mAdapter.getCount() - 1;
+                            if (mCurrentPosition == count) {
+                                mBinding.viewPager.setCurrentItem(mCurrentPosition, false);
                                 mCurrentPosition = 0;
-                                mBinding.viewPager.setCurrentItem(mCurrentPosition++, false);
                             } else {
                                 mBinding.viewPager.setCurrentItem(mCurrentPosition++, true);
                             }
@@ -176,19 +172,12 @@ public class CustomViewPager extends FrameLayout {
             subscription.dispose();
     }
 
-    @Override
-    public boolean performClick() {
-        return true;
-    }
-
     private class CustomViewPagerAdapter extends PagerAdapter {
 
-        private Context mContext;
         private ArrayList<String> mResources;
         private ItemPagerBinding mBinding;
 
-        public CustomViewPagerAdapter(Context mContext) {
-            this.mContext = mContext;
+        public CustomViewPagerAdapter() {
         }
 
         @Override
@@ -205,11 +194,16 @@ public class CustomViewPager extends FrameLayout {
 
         @Override
         public Object instantiateItem(ViewGroup container, final int position) {
-            View itemView = LayoutInflater.from(mContext).inflate(R.layout.item_pager, container, false);
-            mBinding = DataBindingUtil.bind(itemView);
+            View itemView = LayoutInflater.from(container.getContext())
+                    .inflate(R.layout.item_pager, container, false);
 
-            Glide.with(mContext)
+            mBinding = bind(itemView);
+
+            GlideApp.with(container.getContext())
                     .load(mResources.get(position))
+                    .placeholder(R.mipmap.ic_launcher)
+                    .dontAnimate()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(mBinding.imgPagerItem);
 
             mBinding.imgPagerItem.setOnClickListener(new View.OnClickListener() {
@@ -232,6 +226,7 @@ public class CustomViewPager extends FrameLayout {
             this.mResources = mResources;
             notifyDataSetChanged();
         }
+
     }
 
     public void setSlideClickedListener(SlideClickedListener slideClickedListener) {
@@ -239,6 +234,8 @@ public class CustomViewPager extends FrameLayout {
     }
 
     interface SlideClickedListener {
+
         void onSlideClickedListener(String imagePath);
+
     }
 }
