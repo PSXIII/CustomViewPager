@@ -37,8 +37,8 @@ public class CustomViewPager extends FrameLayout {
     private Disposable subscription;
     private CustomViewpagerBinding mBinding;
     private CustomViewPagerAdapter mAdapter;
-    public SlideClickedListener slideClickedListener;
-    private int delay;
+    public SlideClickedListener mListener;
+    private int mDelay;
 
     public CustomViewPager(Context context) {
         super(context);
@@ -72,7 +72,7 @@ public class CustomViewPager extends FrameLayout {
     }
 
     private void initInstance() {
-        delay = 0;
+        mDelay = 0;
         mBinding.viewPager.performClick();
         mAdapter = new CustomViewPagerAdapter();
         mBinding.viewPager.setAdapter(mAdapter);
@@ -82,7 +82,7 @@ public class CustomViewPager extends FrameLayout {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (delay == 0)
+        if (mDelay == 0)
             return super.dispatchTouchEvent(ev);
 
         switch (ev.getAction()) {
@@ -92,7 +92,7 @@ public class CustomViewPager extends FrameLayout {
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                runSlide(delay);
+                runSlide(mDelay);
                 break;
         }
         return super.dispatchTouchEvent(ev);
@@ -148,7 +148,7 @@ public class CustomViewPager extends FrameLayout {
 
     public void runSlide(int delay) {
         stopSlide();
-        this.delay = delay;
+        mDalay = delay;
 
         if (subscription == null || subscription.isDisposed())
             subscription = Observable.interval(delay, TimeUnit.MILLISECONDS)
@@ -209,7 +209,7 @@ public class CustomViewPager extends FrameLayout {
             mBinding.imgPagerItem.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    slideClickedListener.onSlideClickedListener(mResources.get(position));
+                    mListener.onSlideClickedListener(mResources.get(position));
                 }
             });
             container.addView(itemView);
@@ -230,7 +230,7 @@ public class CustomViewPager extends FrameLayout {
     }
 
     public void setSlideClickedListener(SlideClickedListener slideClickedListener) {
-        this.slideClickedListener = slideClickedListener;
+        mListener = slideClickedListener;
     }
 
     interface SlideClickedListener {
